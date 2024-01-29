@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 
 namespace LagoBlanco.Domain.Entities
 {
@@ -32,8 +33,9 @@ namespace LagoBlanco.Domain.Entities
         public DateTime? Updated_Date { get; set; }
         
         
-        //[NotMapped]
+        //[NotMapped] //for upload images
         //public IFormFile? Image { get; set; }
+        
         //[ValidateNever]
         //public IEnumerable<Amenity> VillaAmenity { get; set; }
         //[NotMapped]
