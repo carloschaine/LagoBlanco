@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
 
 namespace LagoBlanco.Domain.Entities
 {
@@ -36,8 +37,9 @@ namespace LagoBlanco.Domain.Entities
         [NotMapped] //for upload images
         public IFormFile? Image { get; set; }
 
-        //[ValidateNever]
-        //public IEnumerable<Amenity> VillaAmenity { get; set; }
+        [ValidateNever]
+        public IEnumerable<Amenity> amenities { get; set; }
+
         //[NotMapped]
         //public bool IsAvailable { get; set; } = true;
     }
