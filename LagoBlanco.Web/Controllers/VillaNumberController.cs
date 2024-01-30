@@ -106,8 +106,9 @@ namespace LagoBlanco.Web.Controllers
         [HttpPost]
         public IActionResult Delete(VillaNumberVM villaNumberVM)
         {
-            if (ModelState.IsValid) {
-                _repo.VillaNumber.Remove(villaNumberVM.VillaNumber);
+            VillaNumber? objFromDb = _repo.VillaNumber.Get(u =>u.Villa_Number ==villaNumberVM.VillaNumber.Villa_Number);
+            if (objFromDb  is not null) {
+                _repo.VillaNumber.Remove(objFromDb);
                 _repo.VillaNumber.Save();
                 TempData["success"] = "The villaNumber has been deleted successfully.";
                 return RedirectToAction(nameof(Index));

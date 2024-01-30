@@ -12,6 +12,7 @@ namespace LagoBlanco.Infrastructure.Repository
     {
         public IVillaRepository Villa { get; private set; }
         public IVillaNumberRepository VillaNumber { get; private set; }
+        public IAmenityRepository Amenity { get; private set; }
 
         private readonly AppDbContext _db;
 
@@ -20,6 +21,7 @@ namespace LagoBlanco.Infrastructure.Repository
             _db = db;
             Villa = new VillaRepository(_db);
             VillaNumber = new VillaNumberRepository(_db);
+            Amenity = new AmenityRepository(_db);
         }
     }
 }
