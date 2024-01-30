@@ -9,11 +9,12 @@ namespace LagoBlanco.Web.Controllers
     public class VillaController : Controller
     {
         private readonly IUnitOfWork _repo;
-        public VillaController(IUnitOfWork repo)
-        {
-            _repo = repo;
+        private readonly IWebHostEnvironment _webHostEnvironment;
+        public VillaController(IUnitOfWork repo,
+                               IWebHostEnvironment webHostEnvironment)
+        {   _repo = repo;
+            _webHostEnvironment = webHostEnvironment; //path donde guardar images
         }
-
 
         public IActionResult Index()
         {
@@ -34,6 +35,20 @@ namespace LagoBlanco.Web.Controllers
                 ModelState.AddModelError("name", "La description no puede ser igual al nombre");}
 
             if (ModelState.IsValid) { 
+
+                //---Creo Archivo JPG
+                if(obj.Image is not null) {
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(obj.Image.FileName);
+                    string imagePath = Path.Combine(_webHostEnvironment.WebRootPath,//hasta wwwroot
+                                                    @"Images\VillaImage");
+                    using var fileStream = new FileStream(Path.Combine(imagePath, fileName), FileMode.Create);
+                    obj.Image.CopyTo(fileStream);
+                    obj.ImageUrl = @"\Images\VillaImage\" + fileName;
+                }
+                else {
+                    obj.ImageUrl = @"\images\placeholder.png"; 
+                }
+
                 _repo.Villa.Add(obj);
                 _repo.Villa.Save();
                 TempData["success"] = "The villa has been created successfully.";
@@ -57,6 +72,23 @@ namespace LagoBlanco.Web.Controllers
         {
 
             if (ModelState.IsValid && obj.Id > 0) {
+                //---Creo Archivo JPG
+                if (obj.Image is not null) {
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(obj.Image.FileName);
+                    string imagePath = Path.Combine(_webHostEnvironment.WebRootPath, @"Images\VillaImage");
+                    //---
+                    if (!string.IsNullOrEmpty(obj.ImageUrl)) {
+                        var oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath, obj.ImageUrl.TrimStart('\\'));
+                        if (System.IO.File.Exists(oldImagePath)) System.IO.File.Delete(oldImagePath);
+                    }
+                    using var fileStream = new FileStream(Path.Combine(imagePath, fileName), FileMode.Create);
+                    obj.Image.CopyTo(fileStream);
+                    obj.ImageUrl = @"\Images\VillaImage\" + fileName;
+                }
+                else {
+                    obj.ImageUrl = @"\images\placeholder.png";
+                }
+
                 _repo.Villa.Update(obj);
                 _repo.Villa.Save();
                 TempData["success"] = "The villa has been updated successfully.";
@@ -81,6 +113,10 @@ namespace LagoBlanco.Web.Controllers
             Villa? objDb = _repo.Villa.Get(v => v.Id == obj.Id);
 
             if (objDb is not null) {
+                if (!string.IsNullOrEmpty(obj.ImageUrl)) {
+                    var oldImagePath = Path.Combine(_webHostEnvironment.WebRootPath, obj.ImageUrl.TrimStart('\\'));
+                    if (System.IO.File.Exists(oldImagePath)) System.IO.File.Delete(oldImagePath);
+                }
                 _repo.Villa.Remove(objDb);
                 _repo.Villa.Save();
                 TempData["success"] = "The villa has been updated successfully.";

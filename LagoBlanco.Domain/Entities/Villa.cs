@@ -31,11 +31,11 @@ namespace LagoBlanco.Domain.Entities
 
         public DateTime? Created_Date { get; set; }
         public DateTime? Updated_Date { get; set; }
-        
-        
-        //[NotMapped] //for upload images
-        //public IFormFile? Image { get; set; }
-        
+
+
+        [NotMapped] //for upload images
+        public IFormFile? Image { get; set; }
+
         //[ValidateNever]
         //public IEnumerable<Amenity> VillaAmenity { get; set; }
         //[NotMapped]
