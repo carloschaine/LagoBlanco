@@ -1,4 +1,5 @@
 ﻿using LagoBlanco.Domain.Entities;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -8,21 +9,20 @@ using System.Threading.Tasks;
 
 namespace LagoBlanco.Infrastructure.Data
 {
-    public class AppDbContext:DbContext 
+    public class AppDbContext:IdentityDbContext<ApplicationUser>
     {
         public AppDbContext(DbContextOptions<AppDbContext> options):base(options)
-        {
-            
-        }
+        {}
+
         public DbSet<Villa>       Villas       { get; set; }
         public DbSet<VillaNumber> VillaNumbers { get; set; }
         public DbSet<Amenity>     Amenities    { get; set; }
-
+        //public DbSet<ApplicationUser> ApplicationUsers { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
+            base.OnModelCreating(modelBuilder);//aca crea las tablas de Identity
 
             modelBuilder.Entity<Villa>().HasData(
                 new Villa {Id = 1, Name = "Royal Villa",

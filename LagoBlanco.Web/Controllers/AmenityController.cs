@@ -1,7 +1,9 @@
 ﻿using LagoBlanco.Application.Common.Interfaces;
+using LagoBlanco.Application.Common.Utility;
 using LagoBlanco.Domain.Entities;
 using LagoBlanco.Infrastructure.Data;
 using LagoBlanco.Web.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace LagoBlanco.Web.Controllers
 {
+    [Authorize(Roles = SD.Role_Admin) ]
     public class AmenityController : Controller
     {
         private readonly IUnitOfWork _repo;

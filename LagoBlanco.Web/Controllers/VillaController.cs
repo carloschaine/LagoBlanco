@@ -1,11 +1,14 @@
 ﻿using LagoBlanco.Application.Common.Interfaces;
+using LagoBlanco.Application.Common.Utility;
 using LagoBlanco.Domain.Entities;
 using LagoBlanco.Infrastructure.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace LagoBlanco.Web.Controllers
 {
+    [Authorize]
     public class VillaController : Controller
     {
         private readonly IUnitOfWork _repo;
