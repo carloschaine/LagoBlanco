@@ -40,7 +40,7 @@ namespace LagoBlanco.Domain.Entities
         [ValidateNever]
         public IEnumerable<Amenity> amenities { get; set; }
 
-        //[NotMapped]
-        //public bool IsAvailable { get; set; } = true;
+        [NotMapped]
+        public bool IsAvailable { get; set; } = true;
     }
 }
