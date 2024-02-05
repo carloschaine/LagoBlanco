@@ -8,8 +8,13 @@ namespace LagoBlanco.Application.Common.Interfaces
 {
     public interface IUnitOfWork
     {
+        IAppUserRepository User { get; }   
+
         IVillaRepository Villa { get; }
         IVillaNumberRepository VillaNumber { get; }
         IAmenityRepository Amenity { get; }
+        IBookingRepository Booking { get; }
+
+        void Save();
     }
 }
