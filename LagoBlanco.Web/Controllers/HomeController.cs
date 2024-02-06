@@ -1,4 +1,5 @@
 using LagoBlanco.Application.Common.Interfaces;
+using LagoBlanco.Application.Common.Utility;
 using LagoBlanco.Web.Models;
 using LagoBlanco.Web.ViewModels;
 using Microsoft.AspNetCore.Mvc;
@@ -33,9 +34,17 @@ namespace LagoBlanco.Web.Controllers
         {
             Thread.Sleep(1000);
             var villaList = _unitOfWork.Villa.GetAll(includeProperties: "amenities"); 
+
+            var villaNumbers = _unitOfWork.VillaNumber.GetAll().ToList();
+            var bookedVillas = _unitOfWork.Booking.GetAll(b=>b.Status==SD.StatusApproved || 
+                                                             b.Status==SD.StatusCheckedIn).ToList();  
             foreach (var villa in villaList) {
-                if (villa.Id % 2 == 0) { villa.IsAvailable = false;}
+                int roomAvailable = 
+                    SD.VillaRoomsAvailable_Count(villa.Id, villaNumbers, checkInDate, nights, bookedVillas);
+                                         
+                villa.IsAvailable = roomAvailable > 0;
             }
+
             HomeVM homeVM = new() {VillaList=villaList,  Nights=nights, CheckInDate=checkInDate};
             return PartialView("_VillaList", homeVM);
         }

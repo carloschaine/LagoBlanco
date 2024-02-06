@@ -50,11 +50,13 @@ namespace LagoBlanco.Infrastructure.Repository
             //---
             if (filter is not null) query = query.Where(filter);
             //---
+          
+
             if (!string.IsNullOrEmpty(includeProperties)) {
                 // "VillaNumber, Villa"
                 foreach (var property in includeProperties
                             .Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)) {
-                    query.Include(property);
+                    query = query.Include(property);
                 }
             }
             //---

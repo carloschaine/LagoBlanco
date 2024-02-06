@@ -48,7 +48,8 @@ namespace LagoBlanco.Domain.Entities
         public DateTime ActualCheckOutDate { get; set; }
 
         public int VillaNumber { get; set; }
-
+        [NotMapped]
+        public List<VillaNumber> VillaNumbers { get; set; }
 
 
         [ForeignKey("UserId")]
@@ -57,7 +58,6 @@ namespace LagoBlanco.Domain.Entities
         public Villa Villa { get; set; }
 
         
-        //[NotMapped]
-        //public List<VillaNumber> VillaNumbers { get; set; }
+        
     }
 }

@@ -15,18 +15,21 @@ namespace LagoBlanco.Web.Controllers
     public class BookingController : Controller
     {
         private readonly IUnitOfWork _repo;
-        //private readonly UserManager<ApplicationUser> _userManager;
-        //private readonly RoleManager<IdentityRole> _roleManager;
-        //private readonly SignInManager<ApplicationUser> _signInManager;
-        public BookingController(IUnitOfWork repo
-            //UserManager<ApplicationUser> userManager,
-                                 //RoleManager<IdentityRole> roleManager,
-                                 //SignInManager<ApplicationUser> signInManager
-            )
+        public BookingController(IUnitOfWork repo)
         {
             _repo = repo;
-            //_userManager = userManager; _roleManager = roleManager; _signInManager = signInManager;
         }
+
+
+
+        [Authorize]
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+
+
 
         [Authorize]
         public IActionResult FinalizeBooking(int villaId, string checkInDate, int nights)
@@ -62,7 +65,21 @@ namespace LagoBlanco.Web.Controllers
             var villa = _repo.Villa.Get(v => v.Id == booking.VillaId);
             booking.TotalCost = villa.Price * booking.Nights;
             booking.Status = SD.StatusPending;
-            booking.BookingDate = DateTime.Now; 
+            booking.BookingDate = DateTime.Now;
+
+
+            //---
+            var villaNumbers = _repo.VillaNumber.GetAll().ToList();
+            var bookedVillas = _repo.Booking.GetAll(b => b.Status == SD.StatusApproved ||
+                                                         b.Status == SD.StatusCheckedIn).ToList();
+            int roomAvailable = SD.VillaRoomsAvailable_Count(villa.Id, villaNumbers, booking.CheckInDate, 
+                                                             booking.Nights, bookedVillas);
+            if (roomAvailable== 0) {
+                TempData["error"] = "Room has been sold out.";
+                return RedirectToAction(nameof(FinalizeBooking), new {
+                    villaId = booking.VillaId, checkInDate = booking.CheckInDate, nights = booking.Nights
+                });
+            }
             //---
             _repo.Booking.Add(booking);
             _repo.Save();
@@ -110,7 +127,7 @@ namespace LagoBlanco.Web.Controllers
                 var service = new SessionService();
                 Session session = service.Get(bookingDb.StripeSessionId);
                 if (session.PaymentStatus == "paid") {
-                    _repo.Booking.UpdateStatus(bookingDb.Id, SD.StatusApproved);
+                    _repo.Booking.UpdateStatus(bookingDb.Id, SD.StatusApproved, 0);
                     _repo.Booking.UpdateStripePaymentId(bookingDb.Id, session.Id, session.PaymentIntentId);
                     _repo.Save();
                 }
@@ -119,6 +136,90 @@ namespace LagoBlanco.Web.Controllers
         }
 
 
+        [Authorize]
+        public IActionResult BookingDetails(int bookingId)
+        {
+            Booking bookingDb = _repo.Booking.Get(u => u.Id==bookingId, includeProperties: "User,Villa");
+
+            if (bookingDb.VillaNumber == 0 && bookingDb.Status == SD.StatusApproved) {
+                List<int> availableVillaNumber = AssignAvailableVillaNumberByVilla(bookingDb.VillaId);
+
+                bookingDb.VillaNumbers = _repo.VillaNumber.GetAll(u => 
+                            u.VillaId==bookingDb.VillaId && 
+                            availableVillaNumber.Any(x=>x==u.Villa_Number)).ToList();
+            }
+            return View(bookingDb);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = SD.Role_Admin)]
+        public IActionResult CheckIn(Booking booking)
+        {
+            _repo.Booking.UpdateStatus(booking.Id, SD.StatusCheckedIn, booking.VillaNumber);
+            _repo.Save();
+            TempData["Success"] = "Booking CheckIn Successfully.";
+            return RedirectToAction(nameof(BookingDetails), new { bookingId = booking.Id });
+        }
+
+        [HttpPost]
+        [Authorize(Roles = SD.Role_Admin)]
+        public IActionResult CheckOut(Booking booking)
+        {
+            _repo.Booking.UpdateStatus(booking.Id, SD.StatusCompleted, booking.VillaNumber);
+            _repo.Save();
+            TempData["Success"] = "Booking Completed Successfully.";
+            return RedirectToAction(nameof(BookingDetails), new { bookingId = booking.Id });
+        }
+
+        [HttpPost]
+        [Authorize(Roles = SD.Role_Admin)]
+        public IActionResult CancelBooking(Booking booking)
+        {
+            _repo.Booking.UpdateStatus(booking.Id, SD.StatusCancelled, 0);
+            _repo.Save();
+            TempData["Success"] = "Booking Canceled Successfully.";
+            return RedirectToAction(nameof(BookingDetails), new { bookingId = booking.Id });
+        }
+
+
+        private List<int> AssignAvailableVillaNumberByVilla(int villaId)
+        {
+            List<int> availableVillaNumbers = new();
+            var villaNumbers = _repo.VillaNumber.GetAll(u => u.VillaId == villaId);
+
+            var checkedInVilla = _repo.Booking.GetAll(u => u.VillaId == villaId && 
+                                                           u.Status  == SD.StatusCheckedIn)
+                                              .Select(u => u.VillaNumber);
+            foreach (var villaNumber in villaNumbers) {
+                if (!checkedInVilla.Contains(villaNumber.Villa_Number)) 
+                    availableVillaNumbers.Add(villaNumber.Villa_Number);
+            }
+            return availableVillaNumbers;
+        }
+
+
+
+        #region Api Calls
+        [HttpGet]
+        [Authorize]
+        public IActionResult GetAll(string status)
+        {
+            IEnumerable<Booking> objBookings;
+            if (User.IsInRole(SD.Role_Admin)) 
+            {   objBookings = _repo.Booking.GetAll(includeProperties:"User,Villa");
+            }
+            else {
+                var claimsIdentity = (ClaimsIdentity)User.Identity;
+                var userId = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier).Value;
+                objBookings = _repo.Booking.GetAll(b=>b.UserId==userId, includeProperties: "User,Villa");
+            }
+            if (!string.IsNullOrEmpty(status)) {
+                objBookings = objBookings.Where(b=>b.Status.ToLower() == status.ToLower());
+            }
+            return Json(new {data=objBookings});
+        }
+
+        #endregion
 
     }
 }

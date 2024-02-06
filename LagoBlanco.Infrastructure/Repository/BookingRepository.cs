@@ -30,13 +30,13 @@ namespace LagoBlanco.Infrastructure.Repository
             _db.SaveChanges();
         }
 
-        public void UpdateStatus(int bookingId, string bookingStatus)
+        public void UpdateStatus(int bookingId, string bookingStatus, int villaNumber=0)
         {
             var bookingDb = _db.Bookings.FirstOrDefault(m => m.Id == bookingId);
             if (bookingDb != null) {
                 bookingDb.Status = bookingStatus;
                 if (bookingStatus == SD.StatusCheckedIn) {
-                    //bookingDb.VillaNumber = villaNumber;
+                    bookingDb.VillaNumber = villaNumber;
                     bookingDb.ActualCheckInDate = DateTime.Now;
                 }
                 if (bookingStatus == SD.StatusCompleted) {
