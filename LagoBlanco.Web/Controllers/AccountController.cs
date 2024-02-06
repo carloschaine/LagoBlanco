@@ -117,14 +117,15 @@ namespace LagoBlanco.Web.Controllers
                                                                       loginVM.RememberMe, false);
                 //---
                 if (result.Succeeded) {
-                    //var user = await _userManager.FindByEmailAsync(loginVM.Email);
-                    //if (await _userManager.IsInRoleAsync(user, SD.Role_Admin)) {
-                    //    return RedirectToAction("Index", "Dashboard");
-                    //}
-                    //else{   
-                    if (string.IsNullOrEmpty(loginVM.RedirectUrl)) return RedirectToAction("Index", "Home");
-                    return LocalRedirect(loginVM.RedirectUrl);                        
-                    //}
+                    var user = await _userManager.FindByEmailAsync(loginVM.Email);
+                    if (await _userManager.IsInRoleAsync(user, SD.Role_Admin)) {
+                        return RedirectToAction("Index", "Dashboard");
+                    }
+                    else{   
+                        if (string.IsNullOrEmpty(loginVM.RedirectUrl)) 
+                            return RedirectToAction("Index", "Home");
+                        return LocalRedirect(loginVM.RedirectUrl);                        
+                    }
                 }
                 else {
                     ModelState.AddModelError("", "Invalid login attempt.");
