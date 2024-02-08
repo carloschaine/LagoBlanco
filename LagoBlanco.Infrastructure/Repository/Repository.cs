@@ -26,7 +26,11 @@ namespace LagoBlanco.Infrastructure.Repository
                                      string? includeProperties = null,
                                      bool tracked = false)
         {
-            IQueryable<T> query = dbSet; // _db.Set<Villa>();
+            IQueryable<T> query; 
+            if (tracked) 
+                query = dbSet; 
+            else
+                query = dbSet.AsNoTracking();
             //---
             if (filter is not null) query = query.Where(filter);
             //---
@@ -45,8 +49,12 @@ namespace LagoBlanco.Infrastructure.Repository
         public T Get(Expression<Func<T, bool>> filter, 
                      string? includeProperties = null, 
                      bool tracked = false)
-        {
-            IQueryable<T> query = dbSet; //_db.Set<T>();
+        {            
+            IQueryable<T> query;
+            if (tracked)
+                query = dbSet;
+            else
+                query = dbSet.AsNoTracking();
             //---
             if (filter is not null) query = query.Where(filter);
             //---

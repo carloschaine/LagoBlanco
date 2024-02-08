@@ -133,7 +133,5 @@ namespace LagoBlanco.Web.Controllers
             }
             return View(loginVM);
         }
-
-
     }
 }
