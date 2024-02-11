@@ -1,4 +1,6 @@
 using LagoBlanco.Application.Common.Interfaces;
+using LagoBlanco.Application.Services.Implementation;
+using LagoBlanco.Application.Services.Interface;
 using LagoBlanco.Domain.Entities;
 using LagoBlanco.Infrastructure.Data;
 using LagoBlanco.Infrastructure.Repository;
@@ -35,6 +37,13 @@ builder.Services.ConfigureApplicationCookie(option =>
 
 
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IUserService, UserService>();//AccountService, ambigua referencia con Stripe
+builder.Services.AddScoped<IDashboardService,DashboardService>();
+builder.Services.AddScoped<IVillaService, VillaService>();
+builder.Services.AddScoped<IVillaNumberService, VillaNumberService>();
+builder.Services.AddScoped<IAmenityService, AmenityService>();
+builder.Services.AddScoped<IBookingService, BookingService>();
+
 
 var app = builder.Build();
 

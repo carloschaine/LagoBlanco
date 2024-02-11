@@ -2,9 +2,9 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System.ComponentModel.DataAnnotations;
 
-namespace LagoBlanco.Web.ViewModels
+namespace LagoBlanco.Application.Common.DTO.Account
 {
-    public class RegisterVM
+    public class RqstRegister
     {
         [Required]
         public string Email { get; set; }

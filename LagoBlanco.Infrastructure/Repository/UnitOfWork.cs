@@ -21,7 +21,7 @@ namespace LagoBlanco.Infrastructure.Repository
         public UnitOfWork(AppDbContext db)
         {
             _db = db;
-            User = new AppUserRepository(_db); 
+            //User = new AppUserRepository(_db); 
 
             Villa = new VillaRepository(_db);
             VillaNumber = new VillaNumberRepository(_db);

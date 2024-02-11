@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace LagoBlanco.Web.ViewModels
+namespace LagoBlanco.Application.Common.DTO.Account
 {
-    public class LoginVM
+    public class RqstLogin
     {
         [Required]
         public string Email { get; set; }
@@ -10,6 +10,7 @@ namespace LagoBlanco.Web.ViewModels
         [Required]
         [DataType(DataType.Password)]
         public string Password { get; set; }
+
         public bool RememberMe { get; set; }
 
         public string? RedirectUrl { get; set; }

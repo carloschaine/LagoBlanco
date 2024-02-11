@@ -1,37 +1,38 @@
-﻿using LagoBlanco.Application.Common.Interfaces;
-using LagoBlanco.Application.Common.Utility;
+﻿using LagoBlanco.Application.Common.Utility;
+using LagoBlanco.Application.Services.Interface;
 using LagoBlanco.Domain.Entities;
-using LagoBlanco.Infrastructure.Data;
 using LagoBlanco.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+
 
 namespace LagoBlanco.Web.Controllers
 {
-    //[Authorize(Roles = SD.Role_Admin)]
+    [Authorize(Roles = SD.Role_Admin)]
     public class VillaNumberController : Controller
     {
-        private readonly IUnitOfWork _repo;
-        public VillaNumberController(IUnitOfWork repo)
+        private readonly IVillaNumberService _villaNumberService;
+        private readonly IVillaService _villaService;
+        public VillaNumberController(IVillaNumberService villaNumberService,
+                                     IVillaService villaService)
         {
-            _repo = repo;
+            _villaNumberService = villaNumberService;
+            _villaService = villaService;
         }
 
 
         public IActionResult Index()
         {
-            var villaNumbers = _repo.VillaNumber.GetAll(null,"Villa");
-
+            var villaNumbers = _villaNumberService.GetAllVillaNumbers();
             return View(villaNumbers);
         }
+
 
         public IActionResult Create() 
         {
             VillaNumberVM villaNumberVm = new VillaNumberVM() {
-                VillaList = _repo.Villa.GetAll()
+                VillaList = _villaService.GetAllVillas()
                                        .Select(u => new SelectListItem 
                                        { Text = u.Name, Value = u.Id.ToString() }),
                 VillaNumber = new VillaNumber()
@@ -43,18 +44,17 @@ namespace LagoBlanco.Web.Controllers
         [HttpPost]
         public IActionResult Create(VillaNumberVM obj )
         {//Pasado desde el submit de Create. El Form pasa automatic. el Model.  
-            //ModelState.Remove("Villa"); 
-            bool roomExist = _repo.VillaNumber.Any(vn => vn.Villa_Number == obj.VillaNumber.Villa_Number);
-
+            bool roomExist = _villaNumberService.CheckVillaNumberExists(obj.VillaNumber.Villa_Number);
             if (ModelState.IsValid && !roomExist) {
-                _repo.VillaNumber.Add(obj.VillaNumber);
-                _repo.VillaNumber.Save();
+                //---
+                _villaNumberService.CreateVillaNumber(obj.VillaNumber);
+                //---
                 TempData["success"] = "The villaNumber has been created successfully.";
                 return RedirectToAction(nameof(Index));
             }
             if (roomExist) TempData["error"] = "Habitación ya existe.";
             //---
-            obj.VillaList = _repo.Villa.GetAll()
+            obj.VillaList = _villaService.GetAllVillas()
                                        .Select(u => new SelectListItem 
                                         { Text = u.Name, Value = u.Id.ToString() }); 
             return View(obj);
@@ -64,10 +64,10 @@ namespace LagoBlanco.Web.Controllers
         public IActionResult Update(int villaNumberId)
         {
             VillaNumberVM villaNumberVm = new VillaNumberVM() {
-                VillaList = _repo.Villa.GetAll()
+                VillaList = _villaService.GetAllVillas()
                                        .Select(u => new SelectListItem 
                                        { Text = u.Name, Value = u.Id.ToString() }),
-                VillaNumber = _repo.VillaNumber.Get(vn=>vn.Villa_Number==villaNumberId)
+                VillaNumber = _villaNumberService.GetVillaNumberById(villaNumberId)
             };
                        
             if (villaNumberVm.VillaNumber is null)  RedirectToAction("Error", "Home");
@@ -80,15 +80,16 @@ namespace LagoBlanco.Web.Controllers
         {
 
             if (ModelState.IsValid) {
-                _repo.VillaNumber.Update(villaNumberVM.VillaNumber);
-                _repo.VillaNumber.Save();
+                //---
+                _villaNumberService.UpdateVillaNumber(villaNumberVM.VillaNumber); 
+                //---
                 TempData["success"] = "The villaNumber has been modified successfully.";
                 return RedirectToAction(nameof(Index));
             }            
             //---
-            villaNumberVM.VillaList = _repo.Villa.GetAll()
-                                                 .Select(u => new SelectListItem 
-                                                 { Text = u.Name, Value = u.Id.ToString() });
+            villaNumberVM.VillaList = _villaService.GetAllVillas()
+                                                   .Select(u => new SelectListItem 
+                                                      { Text = u.Name, Value = u.Id.ToString() });
             return View(villaNumberVM);
         }
 
@@ -96,10 +97,10 @@ namespace LagoBlanco.Web.Controllers
         public IActionResult Delete(int villaNumberId)
         {
             VillaNumberVM villaNumberVm = new VillaNumberVM() {
-                VillaList = _repo.Villa.GetAll()
-                                       .Select(u => new SelectListItem 
-                                       { Text = u.Name, Value = u.Id.ToString() }),
-                VillaNumber = _repo.VillaNumber.Get(vn => vn.Villa_Number == villaNumberId)
+                VillaList = _villaService.GetAllVillas()
+                                         .Select(u => new SelectListItem 
+                                            { Text = u.Name, Value = u.Id.ToString() }),
+                VillaNumber = _villaNumberService.GetVillaNumberById(villaNumberId)
             };
 
             if (villaNumberVm.VillaNumber is null) RedirectToAction("Error", "Home");
@@ -109,17 +110,18 @@ namespace LagoBlanco.Web.Controllers
         [HttpPost]
         public IActionResult Delete(VillaNumberVM villaNumberVM)
         {
-            VillaNumber? objFromDb = _repo.VillaNumber.Get(u =>u.Villa_Number ==villaNumberVM.VillaNumber.Villa_Number);
+            VillaNumber? objFromDb = _villaNumberService.GetVillaNumberById(villaNumberVM.VillaNumber.Villa_Number);
             if (objFromDb  is not null) {
-                _repo.VillaNumber.Remove(objFromDb);
-                _repo.VillaNumber.Save();
+                //---
+                _villaNumberService.DeleteVillaNumber(objFromDb.Villa_Number);
+                //---
                 TempData["success"] = "The villaNumber has been deleted successfully.";
                 return RedirectToAction(nameof(Index));
             }
             //---
-            villaNumberVM.VillaList = _repo.Villa.GetAll()
-                                                 .Select(u => new SelectListItem 
-                                                 { Text = u.Name, Value = u.Id.ToString() });
+            villaNumberVM.VillaList = _villaService.GetAllVillas()
+                                                   .Select(u => new SelectListItem 
+                                                      { Text = u.Name, Value = u.Id.ToString() });
             return View(villaNumberVM);
         }        
     }

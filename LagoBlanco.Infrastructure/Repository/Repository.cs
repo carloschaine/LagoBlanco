@@ -64,7 +64,7 @@ namespace LagoBlanco.Infrastructure.Repository
                 // "VillaNumber, Villa"
                 foreach (var property in includeProperties
                             .Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries)) {
-                    query = query.Include(property);
+                    query = query.Include(property.Trim());
                 }
             }
             //---

@@ -1,10 +1,11 @@
-﻿namespace LagoBlanco.Web.ViewModels
+﻿namespace LagoBlanco.Application.Common.DTO.Chart
+
 {
-    public class LineChartVM
+    public class LineChartDto
     {
         public List<ChartData> Series { get; set; }
-        public string[] Categories    { get; set; }
-    } 
+        public string[] Categories { get; set; }
+    }
 
     public class ChartData
     {

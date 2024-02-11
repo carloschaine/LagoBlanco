@@ -1,5 +1,6 @@
 ﻿using LagoBlanco.Application.Common.Interfaces;
 using LagoBlanco.Application.Common.Utility;
+using LagoBlanco.Application.Services.Interface;
 using LagoBlanco.Domain.Entities;
 using LagoBlanco.Infrastructure.Repository;
 using Microsoft.AspNetCore.Authorization;
@@ -21,14 +22,23 @@ namespace LagoBlanco.Web.Controllers
 {
     public class BookingController : Controller
     {
-        private readonly IUnitOfWork _repo;
+        private readonly IBookingService _bookingService;
+        private readonly IVillaService _villaService;
+        private readonly IVillaNumberService _villaNumberService;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly IWebHostEnvironment _webHostEnvironment;//obtener path para Exports
-        public BookingController(IUnitOfWork repo, IWebHostEnvironment webHostEnvironment)
+        public BookingController(IBookingService bookingService, 
+                                 IVillaService villaService,
+                                 IVillaNumberService villaNumberService,
+                                 UserManager<ApplicationUser> userManager,
+                                 IWebHostEnvironment webHostEnvironment)
         {
-            _repo = repo;
+            _bookingService = bookingService;
+            _villaService = villaService;
+            _villaNumberService = villaNumberService;
+            _userManager = userManager;
             _webHostEnvironment = webHostEnvironment;
         }
-
 
 
         [Authorize]
@@ -38,22 +48,19 @@ namespace LagoBlanco.Web.Controllers
         }
 
 
-
-
         [Authorize]
         public IActionResult FinalizeBooking(int villaId, string checkInDate, int nights)
         {
             //Obtengo User de Bd con userId que me da el ClaimIdentity. 
             var claimsIdentity = (ClaimsIdentity)User.Identity;
             var userId = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier).Value;
-            ApplicationUser user = _repo.User.Get(u => u.Id == userId); 
-
+            ApplicationUser user = _userManager.FindByIdAsync(userId).GetAwaiter().GetResult(); 
 
             Booking booking = new() {
                 VillaId = villaId, 
                 CheckInDate = DateOnly.ParseExact(checkInDate, "dd/MM/yy"),                 
                 Nights = nights,
-                Villa = _repo.Villa.Get(v=>v.Id==villaId, includeProperties:"amenities"),
+                Villa = _villaService.GetVillaById(villaId),
                 //---
                 UserId=userId, 
                 Name=user.Name,
@@ -71,27 +78,21 @@ namespace LagoBlanco.Web.Controllers
         [HttpPost]
         public IActionResult FinalizeBooking(Booking booking)
         {            
-            var villa = _repo.Villa.Get(v => v.Id == booking.VillaId);
+            var villa = _villaService.GetVillaById(booking.VillaId);
             booking.TotalCost = villa.Price * booking.Nights;
             booking.Status = SD.StatusPending;
             booking.BookingDate = DateTime.Now;
-
-
             //---
-            var villaNumbers = _repo.VillaNumber.GetAll().ToList();
-            var bookedVillas = _repo.Booking.GetAll(b => b.Status == SD.StatusApproved ||
-                                                         b.Status == SD.StatusCheckedIn).ToList();
-            int roomAvailable = SD.VillaRoomsAvailable_Count(villa.Id, villaNumbers, booking.CheckInDate, 
-                                                             booking.Nights, bookedVillas);
-            if (roomAvailable== 0) {
+            
+            if (!_villaService.IsVillaAvailableByDate(villa.Id, booking.Nights, booking.CheckInDate)) {
                 TempData["error"] = "Room has been sold out.";
                 return RedirectToAction(nameof(FinalizeBooking), new {
                     villaId = booking.VillaId, checkInDate = booking.CheckInDate, nights = booking.Nights
                 });
             }
             //---
-            _repo.Booking.Add(booking);
-            _repo.Save();
+            _bookingService.CreateBooking(booking);
+            //---
 
             //--- STRIPE
             var domain = Request.Scheme +  "://"+ Request.Host.Value + "/";
@@ -119,8 +120,7 @@ namespace LagoBlanco.Web.Controllers
             var service = new SessionService();
             Session session = service.Create(options);
             //---
-            _repo.Booking.UpdateStripePaymentId(booking.Id, session.Id,session.PaymentIntentId);             
-            _repo.Save(); 
+            _bookingService.UpdateStripePaymentId(booking.Id, session.Id,session.PaymentIntentId);                         
             //---
             Response.Headers.Add("Location", session.Url);
             return new StatusCodeResult(303);
@@ -131,14 +131,13 @@ namespace LagoBlanco.Web.Controllers
         public IActionResult BookingConfirmation(int bookingId)
         {
 
-            Booking bookingDb = _repo.Booking.Get(u => u.Id == bookingId, includeProperties: "User,Villa");
+            Booking bookingDb = _bookingService.GetBookingById(bookingId);
             if (bookingDb.Status == SD.StatusPending) {
                 var service = new SessionService();
                 Session session = service.Get(bookingDb.StripeSessionId);
                 if (session.PaymentStatus == "paid") {
-                    _repo.Booking.UpdateStatus(bookingDb.Id, SD.StatusApproved, 0);
-                    _repo.Booking.UpdateStripePaymentId(bookingDb.Id, session.Id, session.PaymentIntentId);
-                    _repo.Save();
+                    _bookingService.UpdateStatus(bookingDb.Id, SD.StatusApproved, 0);
+                    _bookingService.UpdateStripePaymentId(bookingDb.Id, session.Id, session.PaymentIntentId);                   
                 }
             }
             return View(bookingId);
@@ -148,14 +147,18 @@ namespace LagoBlanco.Web.Controllers
         [Authorize]
         public IActionResult BookingDetails(int bookingId)
         {
-            Booking bookingDb = _repo.Booking.Get(u => u.Id==bookingId, includeProperties: "User,Villa");
+            Booking bookingDb = _bookingService.GetBookingById(bookingId);
 
             if (bookingDb.VillaNumber == 0 && bookingDb.Status == SD.StatusApproved) {
                 List<int> availableVillaNumber = AssignAvailableVillaNumberByVilla(bookingDb.VillaId);
 
-                bookingDb.VillaNumbers = _repo.VillaNumber.GetAll(u => 
-                            u.VillaId==bookingDb.VillaId && 
-                            availableVillaNumber.Any(x=>x==u.Villa_Number)).ToList();
+                bookingDb.VillaNumbers = _villaNumberService.GetAllVillaNumbers()
+                                    .Where(vn => availableVillaNumber.Any(x => x == vn.Villa_Number))
+                                    .ToList();
+                //availableVillaNumber viene filtrado por VillaId
+                //bookingDb.VillaNumbers = _villaNumberService.GetAllVillaNumbers()
+                //    .Where(vn => vn.VillaId==bookingDb.VillaId && 
+                //            availableVillaNumber.Any(x=>x==vn.Villa_Number)).ToList();
             }
             return View(bookingDb);
         }
@@ -165,8 +168,8 @@ namespace LagoBlanco.Web.Controllers
         [Authorize(Roles = SD.Role_Admin)]
         public IActionResult CheckIn(Booking booking)
         {
-            _repo.Booking.UpdateStatus(booking.Id, SD.StatusCheckedIn, booking.VillaNumber);
-            _repo.Save();
+            _bookingService.UpdateStatus(booking.Id, SD.StatusCheckedIn, booking.VillaNumber);
+            //---
             TempData["Success"] = "Booking CheckIn Successfully.";
             return RedirectToAction(nameof(BookingDetails), new { bookingId = booking.Id });
         }
@@ -175,8 +178,8 @@ namespace LagoBlanco.Web.Controllers
         [Authorize(Roles = SD.Role_Admin)]
         public IActionResult CheckOut(Booking booking)
         {
-            _repo.Booking.UpdateStatus(booking.Id, SD.StatusCompleted, booking.VillaNumber);
-            _repo.Save();
+            _bookingService.UpdateStatus(booking.Id, SD.StatusCompleted, booking.VillaNumber);
+            //---
             TempData["Success"] = "Booking Completed Successfully.";
             return RedirectToAction(nameof(BookingDetails), new { bookingId = booking.Id });
         }
@@ -185,8 +188,8 @@ namespace LagoBlanco.Web.Controllers
         [Authorize(Roles = SD.Role_Admin)]
         public IActionResult CancelBooking(Booking booking)
         {
-            _repo.Booking.UpdateStatus(booking.Id, SD.StatusCancelled, 0);
-            _repo.Save();
+            _bookingService.UpdateStatus(booking.Id, SD.StatusCancelled, 0);
+            //---            
             TempData["Success"] = "Booking Canceled Successfully.";
             return RedirectToAction(nameof(BookingDetails), new { bookingId = booking.Id });
         }
@@ -197,12 +200,10 @@ namespace LagoBlanco.Web.Controllers
 
         private List<int> AssignAvailableVillaNumberByVilla(int villaId)
         {
-            List<int> availableVillaNumbers = new();
-            var villaNumbers = _repo.VillaNumber.GetAll(u => u.VillaId == villaId);
-
-            var checkedInVilla = _repo.Booking.GetAll(u => u.VillaId == villaId && 
-                                                           u.Status  == SD.StatusCheckedIn)
-                                              .Select(u => u.VillaNumber);
+            List<int> availableVillaNumbers = [];
+            var villaNumbers = _villaNumberService.GetAllVillaNumbersByVillaId(villaId);
+            var checkedInVilla = _bookingService.GetCheckedVillaNumbers(villaId);
+            //---
             foreach (var villaNumber in villaNumbers) {
                 if (!checkedInVilla.Contains(villaNumber.Villa_Number)) 
                     availableVillaNumbers.Add(villaNumber.Villa_Number);
@@ -225,7 +226,7 @@ namespace LagoBlanco.Web.Controllers
             document.Open(fileStream, FormatType.Automatic);
 
             //Update Template
-            Booking bookingFromDb = _repo.Booking.Get(b=>b.Id==id,"User,Villa");
+            Booking bookingDb = _bookingService.GetBookingById(id);
 
             // En el doc.word agregamos "xx_" para identificar los campos a asignar. 
             TextSelection textSelection;
@@ -233,39 +234,39 @@ namespace LagoBlanco.Web.Controllers
             //---           
             textSelection = document.Find("xx_customer_name", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = bookingFromDb.Name;
+            textRange.Text = bookingDb.Name;
 
             textSelection = document.Find("xx_customer_phone", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = bookingFromDb.Phone;
+            textRange.Text = bookingDb.Phone;
 
             textSelection = document.Find("xx_customer_email", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = bookingFromDb.Email;
+            textRange.Text = bookingDb.Email;
 
             textSelection = document.Find("XX_BOOKING_NUMBER", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = "BOOKING ID - " + bookingFromDb.Id;
+            textRange.Text = "BOOKING ID - " + bookingDb.Id;
 
             textSelection = document.Find("XX_BOOKING_DATE", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = "BOOKING DATE - " + bookingFromDb.BookingDate.ToShortDateString();
+            textRange.Text = "BOOKING DATE - " + bookingDb.BookingDate.ToShortDateString();
 
             textSelection = document.Find("xx_payment_date", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = bookingFromDb.PaymentDate.ToShortDateString();
+            textRange.Text = bookingDb.PaymentDate.ToShortDateString();
 
             textSelection = document.Find("xx_checkin_date", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = bookingFromDb.CheckInDate.ToShortDateString();
+            textRange.Text = bookingDb.CheckInDate.ToShortDateString();
 
             textSelection = document.Find("xx_checkout_date", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = bookingFromDb.CheckOutDate.ToShortDateString(); ;
+            textRange.Text = bookingDb.CheckOutDate.ToShortDateString(); ;
 
             textSelection = document.Find("xx_booking_total", false, true);
             textRange = textSelection.GetAsOneRange();
-            textRange.Text = bookingFromDb.TotalCost.ToString("c");
+            textRange.Text = bookingDb.TotalCost.ToString("c");
 
 
             //---TABLA
@@ -275,7 +276,7 @@ namespace LagoBlanco.Web.Controllers
             table.TableFormat.Paddings.Top = 7f;
             table.TableFormat.Paddings.Bottom = 7f;
             table.TableFormat.Borders.Horizontal.LineWidth = 1f;
-            int rows = bookingFromDb.VillaNumber > 0 ? 3 : 2;
+            int rows = bookingDb.VillaNumber > 0 ? 3 : 2;
             table.ResetCells(rows, 4);
 
             WTableRow row0 = table.Rows[0];
@@ -289,18 +290,18 @@ namespace LagoBlanco.Web.Controllers
 
             WTableRow row1 = table.Rows[1];
             row1.Cells[0].Width = 80;
-            row1.Cells[0].AddParagraph().AppendText(bookingFromDb.Nights.ToString());
+            row1.Cells[0].AddParagraph().AppendText(bookingDb.Nights.ToString());
             row1.Cells[1].Width = 220;
-            row1.Cells[1].AddParagraph().AppendText(bookingFromDb.Villa.Name);
-            row1.Cells[2].AddParagraph().AppendText((bookingFromDb.TotalCost / bookingFromDb.Nights).ToString("c"));
+            row1.Cells[1].AddParagraph().AppendText(bookingDb.Villa.Name);
+            row1.Cells[2].AddParagraph().AppendText((bookingDb.TotalCost / bookingDb.Nights).ToString("c"));
             row1.Cells[3].Width = 80;
-            row1.Cells[3].AddParagraph().AppendText(bookingFromDb.TotalCost.ToString("c"));
+            row1.Cells[3].AddParagraph().AppendText(bookingDb.TotalCost.ToString("c"));
 
-            if (bookingFromDb.VillaNumber > 0) {
+            if (bookingDb.VillaNumber > 0) {
                 WTableRow row2 = table.Rows[2];
                 row2.Cells[0].Width = 80;
                 row2.Cells[1].Width = 220;
-                row2.Cells[1].AddParagraph().AppendText("Villa Number - " + bookingFromDb.VillaNumber.ToString());
+                row2.Cells[1].AddParagraph().AppendText("Villa Number - " + bookingDb.VillaNumber.ToString());
                 row2.Cells[3].Width = 80;
             }
 
@@ -346,24 +347,20 @@ namespace LagoBlanco.Web.Controllers
 
 
 
-
-
         #region Api Calls
         [HttpGet]
         [Authorize]
         public IActionResult GetAll(string status)
-        {
-            IEnumerable<Booking> objBookings;
-            if (User.IsInRole(SD.Role_Admin)) {
-                objBookings = _repo.Booking.GetAll(includeProperties:"User,Villa");}
-            else {
+        {            
+            status = string.IsNullOrEmpty(status) ? string.Empty : status;
+            string userId = "";
+            //---
+            if (!User.IsInRole(SD.Role_Admin)) {
                 var claimsIdentity = (ClaimsIdentity)User.Identity;
-                var userId = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier).Value;
-                objBookings = _repo.Booking.GetAll(b=>b.UserId==userId, includeProperties: "User,Villa");
+                userId = claimsIdentity.FindFirst(ClaimTypes.NameIdentifier).Value;
             }
-            if (!string.IsNullOrEmpty(status)) {
-                objBookings = objBookings.Where(b=>b.Status.ToLower() == status.ToLower());
-            }
+            //---
+            IEnumerable<Booking> objBookings = _bookingService.GetAllBookings(userId, status);
             return Json(new {data=objBookings});
         }
 

@@ -11,7 +11,6 @@ namespace LagoBlanco.Application.Common.Interfaces
     {
         void Update(Booking booking);
         
-        void UpdateStatus(int bookingId, string bookingStatus, int villaNumber);
-        void UpdateStripePaymentId (int bookingId, string sessionId, string paymentIntentId);
+       
     }
 }

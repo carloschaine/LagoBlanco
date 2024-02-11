@@ -30,35 +30,7 @@ namespace LagoBlanco.Infrastructure.Repository
             _db.SaveChanges();
         }
 
-        public void UpdateStatus(int bookingId, string bookingStatus, int villaNumber=0)
-        {
-            var bookingDb = _db.Bookings.FirstOrDefault(m => m.Id == bookingId);
-            if (bookingDb != null) {
-                bookingDb.Status = bookingStatus;
-                if (bookingStatus == SD.StatusCheckedIn) {
-                    bookingDb.VillaNumber = villaNumber;
-                    bookingDb.ActualCheckInDate = DateTime.Now;
-                }
-                if (bookingStatus == SD.StatusCompleted) {
-                    bookingDb.ActualCheckOutDate = DateTime.Now;
-                }
-            }
-        }
-
-        public void UpdateStripePaymentId(int bookingId, string sessionId, string paymentIntentId)
-        {
-            var bookingDb = _db.Bookings.FirstOrDefault(m => m.Id == bookingId);
-            if (bookingDb != null) {
-                if (!string.IsNullOrEmpty(sessionId)) {
-                    bookingDb.StripeSessionId = sessionId;
-                }
-                if (!string.IsNullOrEmpty(paymentIntentId)) {
-                    bookingDb.StripePaymentIntentId = paymentIntentId;
-                    bookingDb.PaymentDate = DateTime.Now;
-                    bookingDb.IsPaymentSuccessful = true;   
-                }
-            }
-        }
+       
     }
 
 }

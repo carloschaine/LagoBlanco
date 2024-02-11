@@ -1,41 +1,41 @@
-﻿using LagoBlanco.Application.Common.Interfaces;
-using LagoBlanco.Application.Common.Utility;
-using LagoBlanco.Domain.Entities;
-using LagoBlanco.Infrastructure.Data;
+﻿using LagoBlanco.Application.Common.Utility;
+using LagoBlanco.Application.Services.Interface;
 using LagoBlanco.Web.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+
 
 namespace LagoBlanco.Web.Controllers
 {
     [Authorize(Roles = SD.Role_Admin) ]
     public class AmenityController : Controller
     {
-        private readonly IUnitOfWork _repo;
-        public AmenityController(IUnitOfWork repo)
+        private readonly IAmenityService _amenityService;
+        private readonly IVillaService _villaService;
+        public AmenityController(IAmenityService amenityService,
+                                 IVillaService villaService)
         {
-            _repo = repo;
+            _amenityService = amenityService;
+            _villaService = villaService;
         }
 
 
         public IActionResult Index()
         {
-            var amenties = _repo.Amenity.GetAll(null,"Villa");
+            var amenties = _amenityService.GetAllAmenities();
             return View(amenties);
         }
 
         public IActionResult Create() 
         {
             AmenityVM amenityVM = new() {
-                VillaList = _repo.Villa.GetAll()
-                                       .Select(u => new SelectListItem 
-                                       { Text = u.Name, Value = u.Id.ToString() }),
+                VillaList = _villaService.GetAllVillas()
+                                         .Select(u => new SelectListItem 
+                                            { Text = u.Name, Value = u.Id.ToString() }),
                 Amenity = new()
             };
-            return View( amenityVM);  
+            return View(amenityVM);  
         }
 
 
@@ -44,15 +44,16 @@ namespace LagoBlanco.Web.Controllers
         {//Pasado desde el submit de Create. El Form pasa automatic. el Model.  
             
             if (ModelState.IsValid) {
-                _repo.Amenity.Add(obj.Amenity);
-                _repo.Amenity.Save();
+                //---
+                _amenityService.CreateAmenity(obj.Amenity); 
+                //---
                 TempData["success"] = "The Amenity has been created successfully.";
                 return RedirectToAction(nameof(Index));
             }
             //---
-            obj.VillaList = _repo.Villa.GetAll()
-                                       .Select(u => new SelectListItem 
-                                        { Text = u.Name, Value = u.Id.ToString() }); 
+            obj.VillaList = _villaService.GetAllVillas()
+                                         .Select(u => new SelectListItem 
+                                         { Text = u.Name, Value = u.Id.ToString() }); 
             return View(obj);
         }
 
@@ -60,10 +61,10 @@ namespace LagoBlanco.Web.Controllers
         public IActionResult Update(int amenityId)
         {
             AmenityVM amenityVm = new() {
-                VillaList = _repo.Villa.GetAll()
-                                       .Select(u => new SelectListItem 
-                                       { Text = u.Name, Value = u.Id.ToString() }),
-                Amenity = _repo.Amenity.Get(vn=>vn.Id==amenityId)
+                VillaList = _villaService.GetAllVillas()
+                                         .Select(u => new SelectListItem 
+                                           { Text = u.Name, Value = u.Id.ToString() }),
+                Amenity = _amenityService.GetAmenityById(amenityId)
             };
                        
             if (amenityVm.Amenity is null)  RedirectToAction("Error", "Home");
@@ -76,15 +77,16 @@ namespace LagoBlanco.Web.Controllers
         {
 
             if (ModelState.IsValid) {
-                _repo.Amenity.Update(amenityVM.Amenity);
-                _repo.Amenity.Save();
+                //---
+                _amenityService.UpdateAmenity(amenityVM.Amenity);
+                //---
                 TempData["success"] = "The Amenity has been modified successfully.";
                 return RedirectToAction(nameof(Index));
             }            
             //---
-            amenityVM.VillaList = _repo.Villa.GetAll()
-                                             .Select(u => new SelectListItem 
-                                              { Text = u.Name, Value = u.Id.ToString() });
+            amenityVM.VillaList = _villaService.GetAllVillas()
+                                         .Select(u => new SelectListItem 
+                                         { Text = u.Name, Value = u.Id.ToString() });
             return View(amenityVM);
         }
 
@@ -92,10 +94,10 @@ namespace LagoBlanco.Web.Controllers
         public IActionResult Delete(int amenityId)
         {
             AmenityVM amenityVm = new() {
-                VillaList = _repo.Villa.GetAll()
-                                       .Select(u => new SelectListItem 
-                                       { Text = u.Name, Value = u.Id.ToString() }),
-                Amenity = _repo.Amenity.Get(vn => vn.Id == amenityId)
+                VillaList = _villaService.GetAllVillas()
+                                         .Select(u => new SelectListItem 
+                                         { Text = u.Name, Value = u.Id.ToString()}),
+                Amenity = _amenityService.GetAmenityById(amenityId)
             };
 
             if (amenityVm.Amenity is null) RedirectToAction("Error", "Home");
@@ -105,18 +107,17 @@ namespace LagoBlanco.Web.Controllers
         [HttpPost]
         public IActionResult Delete(AmenityVM amenityVM)
         {
-            Amenity? objFromDb = _repo.Amenity.Get(u => u.Id == amenityVM.Amenity.Id); 
-
-            if (objFromDb is not null) {
-                _repo.Amenity.Remove(objFromDb);
-                _repo.Amenity.Save();
+            //---
+            bool deletedAmenity = _amenityService.DeleteAmenity(amenityVM.Amenity.Id); 
+            //---
+            if (deletedAmenity) {                
                 TempData["success"] = "The Amenity has been deleted successfully.";
                 return RedirectToAction(nameof(Index));
             }
             //---
-            amenityVM.VillaList = _repo.Villa.GetAll()
-                                             .Select(u => new SelectListItem 
-                                             { Text = u.Name, Value = u.Id.ToString() });
+            amenityVM.VillaList = _villaService.GetAllVillas()
+                                               .Select(u => new SelectListItem 
+                                               { Text = u.Name, Value = u.Id.ToString() });
             return View(amenityVM);
         }        
     }

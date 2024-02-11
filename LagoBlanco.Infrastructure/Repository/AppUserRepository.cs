@@ -10,10 +10,10 @@ using System.Threading.Tasks;
 namespace LagoBlanco.Infrastructure.Repository
 {
 
-    public class AppUserRepository : Repository<ApplicationUser>, IAppUserRepository
+    public class AppUserdddRepository : Repository<ApplicationUser>, IAppUserRepository
     {
         private readonly AppDbContext _db;
-        public AppUserRepository(AppDbContext db) : base(db)
+        public AppUserdddRepository(AppDbContext db) : base(db)
         {
             _db = db;
         }
